@@ -3,7 +3,7 @@
 rewards = [10, -10, -10, 10, -10, 10, -10, 10, -10, 10, -10, 10, -10]
 
 # Q learning learning rate
-alpha = 0
+alpha = 1
 
 # Q learning discount rate
 gamma = 0

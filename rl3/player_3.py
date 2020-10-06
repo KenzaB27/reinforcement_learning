@@ -101,16 +101,24 @@ def epsilon_greedy(Q,
         # Implemenmt the epsilon-greedy algorithm for a constant epsilon value
         # Use epsilon and all input arguments of epsilon_greedy you see fit
         # It is recommended you use the np.random module
-        action = None
+        if np.random.rand() < epsilon:
+            action = np.random.choice(all_actions)
+        else:
+            action = np.nanargmax(Q[state,:])
         # ADD YOUR CODE SNIPPET BETWEEN EX 3.1
 
     elif eps_type == 'linear':
+        scheduler = ScheduleLinear(anneal_timesteps, epsilon_final, epsilon_initial)
+        epsilon = scheduler.value(current_total_steps)
+        if np.random.rand() < epsilon:
+            action = np.random.choice(all_actions)
+        else:
+            action = np.nanargmax(Q[state, :])
         # ADD YOUR CODE SNIPPET BETWEENEX  3.2
         # Implemenmt the epsilon-greedy algorithm for a linear epsilon value
         # Use epsilon and all input arguments of epsilon_greedy you see fit
         # use the ScheduleLinear class
         # It is recommended you use the np.random module
-        action = None
         # ADD YOUR CODE SNIPPET BETWEENEX  3.2
 
     else:
@@ -157,7 +165,7 @@ class PlayerControllerRL(PlayerController, FishesModelling):
         self.allowed_movements()
         # ADD YOUR CODE SNIPPET BETWEEN EX. 2.1
         # Initialize a numpy array with ns state rows and na state columns with float values from 0.0 to 1.0.
-        Q = None
+        Q = np.random.rand(ns, na)
         # ADD YOUR CODE SNIPPET BETWEEN EX. 2.1
 
         for s in range(ns):
@@ -182,7 +190,7 @@ class PlayerControllerRL(PlayerController, FishesModelling):
         # ADD YOUR CODE SNIPPET BETWEEN EX. 2.3
         # Change the while loop to incorporate a threshold limit, to stop training when the mean difference
         # in the Q table is lower than the threshold
-        while episode <= self.episode_max:
+        while episode <= self.episode_max and diff >= self.threshold:
             # ADD YOUR CODE SNIPPET BETWEENEX. 2.3
 
             s_current = init_pos
@@ -194,7 +202,7 @@ class PlayerControllerRL(PlayerController, FishesModelling):
 
                 # ADD YOUR CODE SNIPPET BETWEEN EX 2.1 and 2.2
                 # Chose an action from all possible actions
-                action = None
+                action = epsilon_greedy(Q, s_current, list_pos, current_total_steps, self.epsilon_initial, self.epsilon_final, self.annealing_timesteps, "linear")
                 # ADD YOUR CODE SNIPPET BETWEEN EX 2.1 and 2.2
 
                 # ADD YOUR CODE SNIPPET BETWEEN EX 5
@@ -216,6 +224,9 @@ class PlayerControllerRL(PlayerController, FishesModelling):
 
                 # ADD YOUR CODE SNIPPET BETWEEN EX. 2.2
                 # Implement the Bellman Update equation to update Q
+                Q[s_current, action] = Q_old[s_current, action] + self.alpha * \
+                    (R + self.gamma *
+                     np.nanmax(Q[s_next, :]) - Q_old[s_current, action])
                 # ADD YOUR CODE SNIPPET BETWEEN EX. 2.2
 
                 s_current = s_next
@@ -224,7 +235,7 @@ class PlayerControllerRL(PlayerController, FishesModelling):
 
             # ADD YOUR CODE SNIPPET BETWEEN EX. 2.3
             # Compute the absolute value of the mean between the Q and Q-old
-            diff = 100
+            diff = abs(np.nanmean(np.subtract(Q, Q_old)))
             # ADD YOUR CODE SNIPPET BETWEEN EX. 2.3
             Q_old[:] = Q
             print(
@@ -236,13 +247,23 @@ class PlayerControllerRL(PlayerController, FishesModelling):
         return Q
 
     def get_policy(self, Q):
-        max_actions = np.nanargmax(Q, axis=1)
+        nan_max_actions_proxy = [None for _ in range(len(Q))]
+        for _ in range(len(Q)):
+            try:
+                nan_max_actions_proxy[_] = np.nanargmax(Q[_])
+            except:
+                nan_max_actions_proxy[_] = np.random.choice([0, 1, 2, 3])
+
+        nan_max_actions_proxy = np.array(nan_max_actions_proxy)
+
+        assert nan_max_actions_proxy.all() == nan_max_actions_proxy.all()
+
         policy = {}
         list_actions = list(self.actions.keys())
         for n in self.state2ind.keys():
             state_tuple = self.state2ind[n]
             policy[(state_tuple[0],
-                    state_tuple[1])] = list_actions[max_actions[n]]
+                    state_tuple[1])] = list_actions[nan_max_actions_proxy[n]]
         return policy
 
 
@@ -349,5 +370,6 @@ class ScheduleLinear(object):
     def value(self, t):
         # ADD YOUR CODE SNIPPET BETWEEN EX 3.2
         # Return the annealed linear value
-        return self.initial_p
+        return self.initial_p + (self.final_p - self.initial_p) * (t / self.schedule_timesteps)
         # ADD YOUR CODE SNIPPET BETWEEN EX 3.2
+

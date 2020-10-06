@@ -157,7 +157,7 @@ class PlayerControllerRL(PlayerController, FishesModelling):
         self.allowed_movements()
         # ADD YOUR CODE SNIPPET BETWEEN EX. 2.1
         # Initialize a numpy array with ns state rows and na state columns with float values from 0.0 to 1.0.
-        Q = None
+        Q = np.random.rand(ns, na)
         # ADD YOUR CODE SNIPPET BETWEEN EX. 2.1
 
         for s in range(ns):
@@ -182,7 +182,7 @@ class PlayerControllerRL(PlayerController, FishesModelling):
         # ADD YOUR CODE SNIPPET BETWEEN EX. 2.3
         # Change the while loop to incorporate a threshold limit, to stop training when the mean difference
         # in the Q table is lower than the threshold
-        while episode <= self.episode_max:
+        while episode <= self.episode_max and diff >= self.threshold:
             # ADD YOUR CODE SNIPPET BETWEENEX. 2.3
 
             s_current = init_pos
@@ -194,7 +194,7 @@ class PlayerControllerRL(PlayerController, FishesModelling):
 
                 # ADD YOUR CODE SNIPPET BETWEEN EX 2.1 and 2.2
                 # Chose an action from all possible actions
-                action = None
+                action = np.nanargmax(Q[s_current])
                 # ADD YOUR CODE SNIPPET BETWEEN EX 2.1 and 2.2
 
                 # ADD YOUR CODE SNIPPET BETWEEN EX 5
@@ -216,6 +216,9 @@ class PlayerControllerRL(PlayerController, FishesModelling):
 
                 # ADD YOUR CODE SNIPPET BETWEEN EX. 2.2
                 # Implement the Bellman Update equation to update Q
+                Q[s_current, action] = Q_old[s_current, action] + self.alpha * \
+                    (R + self.gamma *
+                     np.nanmax(Q[s_next, :]) - Q_old[s_current, action])
                 # ADD YOUR CODE SNIPPET BETWEEN EX. 2.2
 
                 s_current = s_next
@@ -224,7 +227,7 @@ class PlayerControllerRL(PlayerController, FishesModelling):
 
             # ADD YOUR CODE SNIPPET BETWEEN EX. 2.3
             # Compute the absolute value of the mean between the Q and Q-old
-            diff = 100
+            diff = abs(np.nanmean(np.subtract(Q, Q_old)))
             # ADD YOUR CODE SNIPPET BETWEEN EX. 2.3
             Q_old[:] = Q
             print(
@@ -236,13 +239,23 @@ class PlayerControllerRL(PlayerController, FishesModelling):
         return Q
 
     def get_policy(self, Q):
-        max_actions = np.nanargmax(Q, axis=1)
+        nan_max_actions_proxy = [None for _ in range(len(Q))]
+        for _ in range(len(Q)):
+            try:
+                nan_max_actions_proxy[_] = np.nanargmax(Q[_])
+            except:
+                nan_max_actions_proxy[_] = np.random.choice([0, 1, 2, 3])
+
+        nan_max_actions_proxy = np.array(nan_max_actions_proxy)
+
+        assert nan_max_actions_proxy.all() == nan_max_actions_proxy.all()
+
         policy = {}
         list_actions = list(self.actions.keys())
         for n in self.state2ind.keys():
             state_tuple = self.state2ind[n]
             policy[(state_tuple[0],
-                    state_tuple[1])] = list_actions[max_actions[n]]
+                    state_tuple[1])] = list_actions[nan_max_actions_proxy[n]]
         return policy
 
 
@@ -351,3 +364,9 @@ class ScheduleLinear(object):
         # Return the annealed linear value
         return self.initial_p
         # ADD YOUR CODE SNIPPET BETWEEN EX 3.2
+
+
+def q_update(q, alpha, gamma, st, at, rt, st1):
+    q_new = q.copy()
+    q_new[st,at] = q[st,at] + alpha * (rt + gamma * max(q[st1,:]) - q[st,at])
+    return q_new
